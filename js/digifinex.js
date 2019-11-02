@@ -728,7 +728,7 @@ module.exports = class digifinex extends Exchange {
             'market': orderType,
             'order_id': ids.join (','),
         };
-        const response = await this.privatePostCancelOrder (this.extend (request, params));
+        const response = await this.privatePostMarketOrderCancel (this.extend (request, params));
         //
         //     {
         //         "code": 0,
