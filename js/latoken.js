@@ -313,6 +313,7 @@ module.exports = class latoken extends Exchange {
         const market = this.market (symbol);
         const request = {
             'symbol': market['id'],
+            'limit': limit,
         };
         const response = await this.publicGetMarketDataOrderBookSymbol (this.extend (request, params));
         //
