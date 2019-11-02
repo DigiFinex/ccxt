@@ -607,7 +607,7 @@ module.exports = class bittrex extends Exchange {
         const response = await this.publicGetMarkethistory (this.extend (request, params));
         if ('result' in response) {
             if (response['result'] !== undefined) {
-                return this.parseTrades (response['result'], market, since, limit);
+                return this.parseTradesReversal (response['result'], market, since, limit);
             }
         }
         throw new ExchangeError (this.id + ' fetchTrades() returned undefined response');

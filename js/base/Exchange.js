@@ -1133,6 +1133,19 @@ module.exports = class Exchange {
         return this.filterBySymbolSinceLimit (result, symbol, since, limit)
     }
 
+    // 处理某些与其他交易所排序不一样的情况
+    parseTradesReversal (trades, market = undefined, since = undefined, limit = undefined, params = {}) {
+        // this code is commented out temporarily to catch for exchange-specific errors
+        // if (!this.isArray (trades)) {
+        //     throw new ExchangeError (this.id + ' parseTrades expected an array in the trades argument, but got ' + typeof trades);
+        // }
+        let result = Object.values (trades || []).map (trade => this.extend (this.parseTrade (trade, market), params))
+        //result = sortBy (result, 'timestamp')
+        const symbol = (market !== undefined) ? market['symbol'] : undefined
+        result = this.filterBySymbolSinceLimit (result, symbol, since, limit)
+        return sortBy (result, 'timestamp')
+    }
+
     parseTransactions (transactions, currency = undefined, since = undefined, limit = undefined, params = {}) {
         // this code is commented out temporarily to catch for exchange-specific errors
         // if (!this.isArray (transactions)) {
