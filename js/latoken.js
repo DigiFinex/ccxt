@@ -329,7 +329,7 @@ module.exports = class latoken extends Exchange {
         //         ]
         //     }
         //
-        return this.parseOrderBook (response, undefined, 'bids', 'asks', 'price', 'amount');
+        return this.parseOrderBook (response, undefined, 'bids', 'asks', 'price', 'quantity');
     }
 
     parseTicker (ticker, market = undefined) {
