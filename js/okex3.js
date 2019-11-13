@@ -1537,7 +1537,7 @@ module.exports = class okex3 extends Exchange {
             if (item['long_qty'] != 0) {
                 data.push({
                     "timestamp": this_.parse8601 (this_.safeString (item, 'created_at')),
-                    "symbol": symbol,
+                    "symbol": item['instrument_id'],
                     "direction": "buy",
                     "amount": item['long_qty'],
                     "averagePrice": item['long_avg_cost'],
@@ -1553,7 +1553,7 @@ module.exports = class okex3 extends Exchange {
             if (item['short_qty'] != 0) {
                 data.push({
                     "timestamp": this_.parse8601 (this_.safeString (item, 'created_at')),
-                    "symbol": symbol,
+                    "symbol": item['instrument_id'],
                     "direction": "sell",
                     "amount": item['short_qty'],
                     "averagePrice": item['short_avg_cost'],
