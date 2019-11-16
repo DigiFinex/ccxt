@@ -1208,6 +1208,7 @@ module.exports = class okex3 extends Exchange {
         const result = { 'info': response };
         for (let i = 0; i < response.length; i++) {
             const balance = response[i];
+            const riskRate = this.safeString (balance, 'risk_rate');
             const marketId = this.safeString (balance, 'instrument_id');
             const market = this.safeValue (this.markets_by_id, marketId);
             let symbol = undefined;
@@ -1236,6 +1237,7 @@ module.exports = class okex3 extends Exchange {
                     const currencyId = parts[1];
                     const code = this.safeCurrencyCode (currencyId);
                     const account = this.account ();
+                    account['borrowed'] = this.safeFloat (marketBalance, 'borrowed');
                     account['total'] = this.safeFloat (marketBalance, 'balance');
                     account['used'] = this.safeFloat (marketBalance, 'hold');
                     account['free'] = this.safeFloat (marketBalance, 'available');
@@ -1245,6 +1247,7 @@ module.exports = class okex3 extends Exchange {
                 }
             }
             result[symbol] = this.parseBalance (accounts);
+            result[symbol]['risk_rate'] = riskRate
         }
         return result;
     }
