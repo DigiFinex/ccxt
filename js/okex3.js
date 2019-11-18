@@ -1911,6 +1911,9 @@ module.exports = class okex3 extends Exchange {
         }
         const query = this.omit (params, 'type');
         const response = await this[method] (this.extend (request, query));
+        if (JSON.stringify(response) === '{}') { // liujian
+            throw new OrderNotFound('order not found, id: '+id);
+        }
         //
         // spot, margin
         //
