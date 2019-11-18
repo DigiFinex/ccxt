@@ -1488,6 +1488,7 @@ module.exports = class okex3 extends Exchange {
         throw new NotSupported (this.id + " fetchBalance does not support the '" + type + "' type (the type must be one of 'account', 'spot', 'margin', 'futures', 'swap')");
     }
 
+    // 获取持仓 (futures/swap)
     async fetchPositions (type, symbol = undefined, params = {}) {
         let method = undefined;
         let response = {};
@@ -1887,11 +1888,13 @@ module.exports = class okex3 extends Exchange {
         await this.loadMarkets ();
         const market = this.market (symbol);
         const defaultType = this.safeString2 (this.options, 'fetchOrder', 'defaultType', market['type']);
-        const type = this.safeString (params, 'type', defaultType);
+        let type = this.safeString (params, 'type', defaultType);
         if (type === undefined) {
             throw new ArgumentsRequired (this.id + " fetchOrder requires a type parameter (one of 'spot', 'margin', 'futures', 'swap').");
         }
         const instrumentId = (market['futures'] || market['swap']) ? 'InstrumentId' : '';
+        type = market['futures'] ? 'futures' : type; // liujian
+        type = market['swap'] ? 'swap' : type; // liujian
         let method = type + 'GetOrders' + instrumentId;
         const request = {
             'instrument_id': market['id'],
