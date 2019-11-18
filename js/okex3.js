@@ -34,7 +34,6 @@ module.exports = class okex3 extends Exchange {
                 'fetchLedger': true,
                 'withdraw': true,
                 'futures': true,
-                'fetchPositions': true,
             },
             'timeframes': {
                 '1m': '60',

@@ -123,7 +123,6 @@ module.exports = class Exchange {
                 'privateAPI': true,
                 'publicAPI': true,
                 'withdraw': false,
-                'fetchPositions': false,
             },
             'urls': {
                 'logo': undefined,
