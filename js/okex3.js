@@ -1665,8 +1665,7 @@ module.exports = class okex3 extends Exchange {
         }
         await this.loadMarkets ();
         const market = this.market (symbol);
-        const defaultType = this.safeString2 (this.options, 'cancelOrder', 'defaultType', market['type']); // liujian
-        const type = this.safeString (params, 'type', defaultType); // liujian
+        const type = this.safeString (params, 'type', market['type']); // liujian
         let method = type + 'PostCancelOrder';
         const request = {
             'instrument_id': market['id'],
