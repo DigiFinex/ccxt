@@ -1296,6 +1296,7 @@ module.exports = class okex3 extends Exchange {
             // it may be incorrect to use total, free and used for swap accounts
             account['total'] = this.safeFloat (balance, 'equity');
             account['free'] = this.safeFloat (balance, 'total_avail_balance');
+            account['margin_ratio'] = this.safeFloat (balance, 'margin_ratio'); // liujian
             result[code] = account;
         }
         return this.parseBalance (result);
@@ -1335,6 +1336,7 @@ module.exports = class okex3 extends Exchange {
             // it may be incorrect to use total, free and used for swap accounts
             account['total'] = this.safeFloat (balance, 'equity');
             account['free'] = this.safeFloat (balance, 'total_avail_balance');
+            account['margin_ratio'] = this.safeFloat (balance, 'margin_ratio'); // liujian
             result[symbol] = account;
         }
         return this.parseBalance (result);
