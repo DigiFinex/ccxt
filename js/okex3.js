@@ -1969,7 +1969,7 @@ module.exports = class okex3 extends Exchange {
         }
         await this.loadMarkets ();
         const market = this.market (symbol);
-        const type = market['type'];
+        const type = this.safeString (params, 'type', market['type']);
         const request = {
             'instrument_id': market['id'],
             // '-2': failed,
