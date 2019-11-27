@@ -625,14 +625,7 @@ module.exports = class huobipro extends Exchange {
         return result;
     }
 
-    async fetchBalance (params = {}) {
-        await this.loadMarkets ();
-        await this.loadAccounts ();
-        const method = this.options['fetchBalanceMethod'];
-        const request = {
-            'id': this.accounts[0]['id'],
-        };
-        const response = await this[method] (this.extend (request, params));
+    parseSpotBalance(response) {
         const balances = this.safeValue (response['data'], 'list', []);
         const result = { 'info': response };
         for (let i = 0; i < balances.length; i++) {
@@ -651,9 +644,59 @@ module.exports = class huobipro extends Exchange {
             if (balance['type'] === 'frozen') {
                 account['used'] = this.safeFloat (balance, 'balance');
             }
+            if (balance['type'] == 'loan') {
+                account['borrowed'] = - this.safeFloat (balance, 'balance');
+            }
             result[code] = account;
         }
         return this.parseBalance (result);
+    }
+
+    parseSuperMarginBalance(response) {
+        const balances = this.safeValue (response['data'], 'list', []);
+        const result = {'info': response };
+        const accounts = {};
+        for (let i = 0; i < balances.length; i++) {
+            const balance = balances[i];
+            const currencyId = this.safeString (balance, 'currency');
+            const code = this.safeCurrencyCode (currencyId);
+            let account = undefined;
+            if (code in accounts) {
+                account = accounts[code];
+            } else {
+                account = this.account ();
+            }
+            if (balance['type'] === 'trade') {
+                account['free'] = this.safeFloat (balance, 'balance');
+            }
+            if (balance['type'] === 'frozen') {
+                account['used'] = this.safeFloat (balance, 'balance');
+            }
+            if (balance['type'] == 'loan') {
+                account['borrowed'] = - this.safeFloat (balance, 'balance');
+            }
+            accounts[code] = account;
+        }
+        result['cross-margin'] = this.parseBalance(accounts)
+        return result
+    }
+
+    // support super-margin
+    async fetchBalance (params = {}) {
+        await this.loadMarkets ();
+        await this.loadAccounts ();
+        const accountType = this.safeString (params, 'type', 'spot') === 'spot' ? 'spot' : 'super-margin'
+        const method = this.options['fetchBalanceMethod'];
+        const request = {
+            'id': this.getAccountIDByType(accountType),
+        };
+        const response = await this[method] (this.extend (request, params));
+        if (accountType === 'spot') {
+            return this.parseSpotBalance(response)
+        } else if (accountType === 'super-margin') {
+            return this.parseSuperMarginBalance(response)
+        }
+        throw new NotSupported (this.id + " fetchBalance does not support the '" + this.safeString (params, 'type', 'spot') + "' type (the type must be one of 'account', 'spot', 'margin')");
     }
 
     async fetchOrdersByStates (states, symbol = undefined, since = undefined, limit = undefined, params = {}) {
@@ -888,14 +931,17 @@ module.exports = class huobipro extends Exchange {
         };
     }
 
+    // support super-margin
     async createOrder (symbol, type, side, amount, price = undefined, params = {}) {
         await this.loadMarkets ();
         await this.loadAccounts ();
         const market = this.market (symbol);
+        const marginTrading = this.safeString (params, 'margin_trading', '1')
         const request = {
-            'account-id': this.accounts[0]['id'],
+            'account-id': this.getAccountIDByType(marginTrading === '1' ? 'spot' : 'super-margin'),
             'symbol': market['id'],
             'type': side + '-' + type,
+            'source': marginTrading === '1' ? 'api' : 'super-margin-api',
         };
         if ((type === 'market') && (side === 'buy')) {
             if (this.options['createMarketBuyOrderRequiresPrice']) {
@@ -1209,5 +1255,19 @@ module.exports = class huobipro extends Exchange {
             'pre-transfer': 'pending',
         };
         return this.safeString (statuses, status, status);
+    }
+
+    getAccountIDByType (type = 'spot', subtype = '') {
+        let accountId = undefined
+        for (let i = 0; i < this.accounts.length; i++) {
+            const account = this.accounts[i];
+            if (account['type'] === type && account['subtype'] === subtype) {
+                accountId = this.safeString (account, 'id');
+                if (accountId !== undefined) {
+                    break;
+                }
+            }
+        }
+        return accountId
     }
 };
