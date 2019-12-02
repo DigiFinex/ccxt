@@ -1497,14 +1497,18 @@ module.exports = class okex3 extends Exchange {
         if (symbol == undefined) {
             let method = type + 'GetPosition';
             response = await this[method] ();
-            holding = response['holding'][0];
+            if (response.hasOwnProperty('holding') && response['holding'].hasOwnProperty(0)) {
+                holding = response['holding'][0];
+            }
         } else {
             const request = {
                 'instrument_id': symbol,
             };
             let method = type + 'GetInstrumentIdPosition';
             response = await this[method] (request);
-            holding = response['holding'];
+            if (response.hasOwnProperty('holding')) {
+                holding = response['holding'];
+            }
         }
         // futures
         // {
