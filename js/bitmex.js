@@ -245,6 +245,39 @@ module.exports = class bitmex extends Exchange {
         return result;
     }
 
+    async fetchPositions (type, symbol = undefined, params = {}) {
+        await this.loadMarkets ();
+        const request = {};
+        if (symbol !== undefined) {
+            request['filter'] = this.json ({"symbol": this.marketId (symbol)});
+        }
+        const response = await this.privateGetPosition (this.extend (request, params));
+        const result = [];
+        for (let i = 0; i < response.length; i++) {
+            const item = response[i];
+            const amount = this.safeFloat (item, 'currentQty');
+            if (amount == 0) {
+                continue;
+            }
+            // 这里需要注意，bitmex的所有浮盈浮亏全都是以BTC计价的
+            const position = {
+                'timestamp': this.parse8601 (this.safeString (item, 'timestamp')),
+                'symbol': this.safeString (item, 'symbol'),
+                'direction': amount > 0 ? 'buy' : 'sell',
+                'amount': amount,
+                'averagePrice': this.safeFloat (item, 'avgCostPrice'),
+                'markPrice': this.safeFloat (item, 'markPrice'),
+                'lastPrice': this.safeFloat (item, 'lastPrice'),
+                'unrealisedPnl': this.safeFloat (item, 'unrealisedPnl') * 0.00000001,
+                'realisedPnl': this.safeFloat (item, 'realisedPnl') * 0.00000001,
+                'positionMargin': this.safeFloat (item, 'posMargin') * 0.00000001,
+                'liquidationPrice': this.safeFloat (item, 'liquidationPrice'),
+            };
+            result.push(position);
+        }
+        return result;
+    }
+
     async fetchBalance (params = {}) {
         await this.loadMarkets ();
         const request = {
@@ -262,6 +295,13 @@ module.exports = class bitmex extends Exchange {
             if (code === 'BTC') {
                 account['free'] = account['free'] * 0.00000001;
                 account['total'] = account['total'] * 0.00000001;
+            }
+            // 保证金率
+            const marginLeverage = this.safeFloat (balance, 'marginLeverage');
+            if(marginLeverage != 0) {
+                account['margin_ratio'] = 1 / marginLeverage;
+            } else {
+                account['margin_ratio'] = undefined;
             }
             result[code] = account;
         }
@@ -353,7 +393,9 @@ module.exports = class bitmex extends Exchange {
     async fetchClosedOrders (symbol = undefined, since = undefined, limit = undefined, params = {}) {
         // Bitmex barfs if you set 'open': false in the filter...
         const orders = await this.fetchOrders (symbol, since, limit, params);
-        return this.filterBy (orders, 'status', 'closed');
+        // return this.filterBy (orders, 'status', 'closed');
+        // filter closed and canceled
+        return this.filterByArray (orders, 'status', [ 'closed', 'canceled' ], false);
     }
 
     async fetchMyTrades (symbol = undefined, since = undefined, limit = undefined, params = {}) {
