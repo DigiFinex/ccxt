@@ -760,7 +760,7 @@ module.exports = class deribit extends Exchange {
         } else {
             query = '/' + 'api/' + this.version + '/' + api + '/' + path;
         }
-        let url = this.urls['test'] + query;
+        let url = this.urls['api'] + query;
         if (api === 'private') {
             this.checkRequiredCredentials ();
             const nonce = this.nonce ().toString ();
