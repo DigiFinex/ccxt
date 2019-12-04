@@ -19,6 +19,7 @@ module.exports = class deribit extends Exchange {
             'rateLimit': 2000,
             'has': {
                 'CORS': true,
+                'fetchOHLCV': true,
                 'editOrder': true,
                 'fetchOrder': true,
                 'fetchOrders': false,
@@ -26,6 +27,18 @@ module.exports = class deribit extends Exchange {
                 'fetchClosedOrders': true,
                 'fetchMyTrades': true,
                 'fetchTickers': false,
+            },
+            'account_currencys': ['BTC','ETH'],
+            'timeframes': {
+                '1m': '1',
+                '5m': '5',
+                '15m': '15',
+                '30m': '30',
+                '1h': '60',
+                '4h': '240',
+                '12h': '720',
+                '1d': '1D',
+                '1w': '1W',
             },
             'urls': {
                 'test': 'https://test.deribit.com',
@@ -40,6 +53,11 @@ module.exports = class deribit extends Exchange {
                 'referral': 'https://www.deribit.com/reg-1189.4038',
             },
             'api': {
+                'v2_public': {
+                    'get': [
+                        'get_tradingview_chart_data',
+                    ],
+                },
                 'public': {
                     'get': [
                         'ping',
@@ -187,7 +205,7 @@ module.exports = class deribit extends Exchange {
 
     async fetchBalance (params = {}) {
         await this.loadMarkets ();
-        const response = await this.privateGetAccount (params);
+        const result = {};
         //
         //     {
         //         "usOut":1569048827943520,
@@ -223,18 +241,55 @@ module.exports = class deribit extends Exchange {
         //         "message":""
         //     }
         //
-        const result = {
-            'info': response,
-        };
-        const balance = this.safeValue (response, 'result', {});
-        const currencyId = this.safeString (balance, 'currency');
-        const code = this.safeCurrencyCode (currencyId);
-        const account = this.account ();
-        account['free'] = this.safeFloat (balance, 'availableFunds');
-        account['used'] = this.safeFloat (balance, 'maintenanceMargin');
-        account['total'] = this.safeFloat (balance, 'equity');
-        result[code] = account;
+        for (let i = 0; i < this.account_currencys.length; i++) {
+            const request = {'currency': this.account_currencys[i]};
+            let response = await this.privateGetAccount (this.extend (request, params));
+            const balance = this.safeValue (response, 'result', {});
+            const currencyId = this.safeString (balance, 'currency');
+            const code = this.safeCurrencyCode (currencyId);
+            const account = this.account ();
+            account['free'] = this.safeFloat (balance, 'availableFunds');
+            account['total'] = this.safeFloat (balance, 'equity');
+            const deltaTotal = this.safeFloat (balance, 'deltaTotal');
+            if (deltaTotal !== 0) {
+                account['margin_ratio'] = account['total'] / Math.abs (deltaTotal);
+            } else {
+                account['margin_ratio'] = undefined;
+            }
+            result[code] = account;
+        }
         return this.parseBalance (result);
+    }
+
+    async fetchPositions (type, symbol = undefined, params = {}) {
+        await this.loadMarkets ();
+        const request = {
+            'currency': 'all',
+        };
+        const response = await this.privateGetPositions(this.extend (request, params));
+        const positions = this.safeValue (response, 'result', {});
+        const result = [];
+        for (let i = 0; i < positions.length; i++) {
+            const item = positions[i];
+            if (item['kind'] != 'future') {
+                continue;
+            }
+            const position = {
+                'timestamp': this.milliseconds(),
+                'symbol': this.safeString (item, 'instrument'),
+                'direction': this.safeString (item, 'direction'),
+                'amount': Math.abs(this.safeFloat (item, 'size')),
+                'averagePrice': this.safeFloat (item, 'averagePrice'),
+                'markPrice': this.safeFloat (item, 'markPrice'),
+                'lastPrice': this.safeFloat (item, 'indexPrice'),
+                'unrealisedPnl': this.safeFloat (item, 'floatingPl'),
+                'realisedPnl': this.safeFloat (item, 'realizedPl'),
+                'positionMargin': this.safeFloat (item, 'initialMargin'),
+                'liquidationPrice': this.safeFloat (item, 'estLiqPrice'),
+            };
+            result.push(position);
+        }
+        return result;
     }
 
     async fetchDepositAddress (code, params = {}) {
@@ -425,6 +480,48 @@ module.exports = class deribit extends Exchange {
         return this.extend (orderbook, {
             'nonce': this.safeInteger (response, 'tstamp'),
         });
+    }
+    
+    parseOHLCVs (ohlcvs, market = undefined, timeframe = '1m', since = undefined, limit = undefined) {
+        const result = [];
+        for ( let i = 0; i < ohlcvs.ticks.length; i++ ) {
+            result.push([
+                ohlcvs.ticks[i],
+                ohlcvs.open[i],
+                ohlcvs.high[i],
+                ohlcvs.low[i],
+                ohlcvs.close[i],
+                ohlcvs.volume[i],
+            ])
+        }
+        return result;
+    }
+
+    async fetchOHLCV (symbol, timeframe = '1m', since = undefined, limit = undefined, params = {}) {
+        await this.loadMarkets ();
+        const market = this.market (symbol);
+        const request = {
+            'instrument_name': market['id'],
+            "resolution": this.timeframes[timeframe],
+        };
+        if (since !== undefined) {
+            const startTime = parseInt (since / 1000);
+            request['start_timestamp'] = 1000 * startTime;
+            if (limit !== undefined) {
+                const duration = this.parseTimeframe (timeframe);
+                request['end_timestamp'] = 1000 * this.sum (startTime, (limit-1) * duration);
+            } else {
+                request['end_timestamp'] = this.milliseconds();
+            }
+        } else if (limit !== undefined) {
+            const endTime = this.milliseconds();
+            const duration = this.parseTimeframe (timeframe);
+            request['start_timestamp'] = 1000 * this.sum (parseInt (endTime / 1000), -(limit-1) * duration);
+            request['end_timestamp'] = endTime;
+        }
+        const response = await this.v2_publicGetGetTradingviewChartData (this.extend (request, params));
+        const data = this.safeValue (response, 'result', []);
+        return this.parseOHLCVs (data, market, timeframe, since, limit);
     }
 
     parseOrderStatus (status) {
@@ -657,13 +754,14 @@ module.exports = class deribit extends Exchange {
     }
 
     sign (path, api = 'public', method = 'GET', params = {}, headers = undefined, body = undefined) {
-        const query = '/' + 'api/' + this.version + '/' + api + '/' + path;
-        let url = this.urls['api'] + query;
-        if (api === 'public') {
-            if (Object.keys (params).length) {
-                url += '?' + this.urlencode (params);
-            }
+        let query = undefined;
+        if (api == 'v2_public') {
+            query = '/' + 'api/' + 'v2' + '/' + 'public' + '/' + path;
         } else {
+            query = '/' + 'api/' + this.version + '/' + api + '/' + path;
+        }
+        let url = this.urls['test'] + query;
+        if (api === 'private') {
             this.checkRequiredCredentials ();
             const nonce = this.nonce ().toString ();
             let auth = '_=' + nonce + '&_ackey=' + this.apiKey + '&_acsec=' + this.secret + '&_action=' + query;
@@ -680,6 +778,10 @@ module.exports = class deribit extends Exchange {
                 headers['Content-Type'] = 'application/x-www-form-urlencoded';
                 body = this.urlencode (params);
             } else if (Object.keys (params).length) {
+                url += '?' + this.urlencode (params);
+            }
+        } else {
+            if (Object.keys (params).length) {
                 url += '?' + this.urlencode (params);
             }
         }
