@@ -559,3 +559,6 @@ Thank you!
 ## Contact Us
 
 For business inquiries: info@ccxt.trade
+
+## Test for commit
+## 2019/12/13 16:28:00 by Duan Haipeng
