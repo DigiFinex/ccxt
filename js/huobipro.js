@@ -653,6 +653,36 @@ module.exports = class huobipro extends Exchange {
         return this.parseBalance (result);
     }
 
+    parseMarginBalance(response, symbol) {
+        const balances = this.safeValue (response['data'], 'list', []);
+        const result = {
+            'info': response,
+        };
+        result[symbol] = {};
+        for (let i = 0; i < balances.length; i++) {
+            const balance = balances[i];
+            const currencyId = this.safeString (balance, 'currency');
+            const code = this.safeCurrencyCode (currencyId);
+            let account = undefined;
+            if (code in result[symbol]) {
+                account = result[symbol][code];
+            } else {
+                account = this.account ();
+            }
+            if (balance['type'] === 'trade') {
+                account['free'] = this.safeFloat (balance, 'balance');
+            }
+            if (balance['type'] === 'frozen') {
+                account['used'] = this.safeFloat (balance, 'balance');
+            }
+            if (balance['type'] == 'loan') {
+                account['borrowed'] = - this.safeFloat (balance, 'balance');
+            }
+            result[symbol][code] = account;
+        }
+        return this.parseBalance (result);
+    }
+
     parseSuperMarginBalance(response) {
         const balances = this.safeValue (response['data'], 'list', []);
         const result = {'info': response };
@@ -686,14 +716,30 @@ module.exports = class huobipro extends Exchange {
     async fetchBalance (params = {}) {
         await this.loadMarkets ();
         await this.loadAccounts ();
-        const accountType = this.safeString (params, 'type', 'spot') === 'spot' ? 'spot' : 'super-margin'
+        const accountType = this.safeString (params, 'type', 'spot');
+        if (accountType === 'cross-margin') {
+            accountType = 'super-margin'
+        }
         const method = this.options['fetchBalanceMethod'];
         const request = {
-            'id': this.getAccountIDByType(accountType),
+            // 'id': this.getAccountIDByType(accountType),
         };
+        switch (accountType) {
+            case 'spot':
+                request['id'] = this.getAccountIDByType(accountType);
+                break;
+            case 'margin':
+                request['id'] = this.getAccountIDByType(accountType, this.marketId (this.safeString (params, 'symbol')));
+                break;
+            case 'super-margin':
+                request['id'] = this.getAccountIDByType(accountType);
+                break;
+        }
         const response = await this[method] (this.extend (request, params));
         if (accountType === 'spot') {
-            return this.parseSpotBalance(response)
+            return this.parseSpotBalance(response);
+        } else if (accountType === 'margin') {
+            return this.parseMarginBalance(response, this.safeString (params, 'symbol'));
         } else if (accountType === 'super-margin') {
             return this.parseSuperMarginBalance(response)
         }
@@ -939,10 +985,10 @@ module.exports = class huobipro extends Exchange {
         const market = this.market (symbol);
         const marginTrading = this.safeString (params, 'margin_trading', '1')
         const request = {
-            'account-id': this.getAccountIDByType(marginTrading === '1' ? 'spot' : 'super-margin'),
+            'account-id': this.getAccountIDByType(marginTrading === '1' ? 'spot' : 'margin', market['id']),
             'symbol': market['id'],
             'type': side + '-' + type,
-            'source': marginTrading === '1' ? 'api' : 'super-margin-api',
+            'source': marginTrading === '1' ? 'api' : 'margin-api',
         };
         if ((type === 'market') && (side === 'buy')) {
             if (this.options['createMarketBuyOrderRequiresPrice']) {
@@ -1257,15 +1303,23 @@ module.exports = class huobipro extends Exchange {
         return this.safeString (statuses, status, status);
     }
 
-    getAccountIDByType (type = 'spot', subtype = '') {
-        let accountId = undefined
+    getAccountIDByType (type = 'spot', symbol = '') {
+        let accountId = undefined;
         for (let i = 0; i < this.accounts.length; i++) {
             const account = this.accounts[i];
-            if (account['type'] === type && account['subtype'] === subtype) {
+            if (account['type'] !== type) {
+                continue;
+            }
+            if (type === 'spot' || type === 'super-margin') {
                 accountId = this.safeString (account, 'id');
-                if (accountId !== undefined) {
-                    break;
+            } else if (type === 'margin') {
+                const subtype = this.safeString (account, 'subtype');
+                if (symbol === subtype) {
+                    accountId = this.safeString (account, 'id');
                 }
+            }
+            if (accountId !== undefined) {
+                break;
             }
         }
         return accountId
