@@ -664,17 +664,15 @@ module.exports = class huobipro extends Exchange {
         for (let i = 0; i < symbols.length; i++) {
             const symbolData = symbols[i];
             const symbol = this.marketSymbol(this.safeString (symbolData, 'symbol'));
-            result[symbol] = {
-                'risk_rate': this.safeString (symbolData, 'risk-rate')
-            };
+            const symbolBalance = {};
             const balances = this.safeValue (symbolData, 'list', []);
             for (let i = 0; i < balances.length; i++) {
                 const balance = balances[i];
                 const currencyId = this.safeString (balance, 'currency');
                 const code = this.safeCurrencyCode (currencyId);
                 let account = undefined;
-                if (code in result[symbol]) {
-                    account = result[symbol][code];
+                if (code in symbolBalance) {
+                    account = symbolBalance[code];
                 } else {
                     account = this.account ();
                 }
@@ -687,8 +685,10 @@ module.exports = class huobipro extends Exchange {
                 if (balance['type'] == 'loan') {
                     account['borrowed'] = - this.safeFloat (balance, 'balance');
                 }
-                result[symbol][code] = account;
+                symbolBalance[code] = account;
             }
+            result[symbol] = this.parseBalance (symbolBalance);
+            result[symbol]['risk_rate'] = this.safeString (symbolData, 'risk-rate');
         }
         return this.parseBalance (result);
     }
