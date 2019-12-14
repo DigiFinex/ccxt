@@ -99,7 +99,8 @@ module.exports = class huobipro extends Exchange {
                         'dw/withdraw-virtual/addresses', // 查询虚拟币提现地址
                         'query/deposit-withdraw',
                         'margin/loan-orders', // 借贷订单
-                        'margin/accounts/balance', // 借贷账户详情
+                        'margin/accounts/balance', // 逐仓借贷账户详情
+                        'cross-margin/accounts/balance', // 全仓借贷账户详情
                         'points/actions',
                         'points/orders',
                         'subuser/aggregate-balance',
@@ -159,6 +160,8 @@ module.exports = class huobipro extends Exchange {
                 'createMarketBuyOrderRequiresPrice': true,
                 'fetchMarketsMethod': 'publicGetCommonSymbols',
                 'fetchBalanceMethod': 'privateGetAccountAccountsIdBalance',
+                'fetchMarginBalanceMethod': 'privateGetMarginAccountsBalance',
+                'fetchCrossMarginBalanceMethod': 'privateGetCrossMarginAccountsBalance',
                 'createOrderMethod': 'privatePostOrderOrdersPlace',
                 'language': 'en-US',
             },
@@ -653,32 +656,39 @@ module.exports = class huobipro extends Exchange {
         return this.parseBalance (result);
     }
 
-    parseMarginBalance(response, symbol) {
-        const balances = this.safeValue (response['data'], 'list', []);
+    parseMarginBalance(response) {
+        const symbols = this.safeValue (response, 'data', []);
         const result = {
             'info': response,
         };
-        result[symbol] = {};
-        for (let i = 0; i < balances.length; i++) {
-            const balance = balances[i];
-            const currencyId = this.safeString (balance, 'currency');
-            const code = this.safeCurrencyCode (currencyId);
-            let account = undefined;
-            if (code in result[symbol]) {
-                account = result[symbol][code];
-            } else {
-                account = this.account ();
+        for (let i = 0; i < symbols.length; i++) {
+            const symbolData = symbols[i];
+            const symbol = this.marketSymbol(this.safeString (symbolData, 'symbol'));
+            result[symbol] = {
+                'risk_rate': this.safeString (symbolData, 'risk-rate')
+            };
+            const balances = this.safeValue (symbolData, 'list', []);
+            for (let i = 0; i < balances.length; i++) {
+                const balance = balances[i];
+                const currencyId = this.safeString (balance, 'currency');
+                const code = this.safeCurrencyCode (currencyId);
+                let account = undefined;
+                if (code in result[symbol]) {
+                    account = result[symbol][code];
+                } else {
+                    account = this.account ();
+                }
+                if (balance['type'] === 'trade') {
+                    account['free'] = this.safeFloat (balance, 'balance');
+                }
+                if (balance['type'] === 'frozen') {
+                    account['used'] = this.safeFloat (balance, 'balance');
+                }
+                if (balance['type'] == 'loan') {
+                    account['borrowed'] = - this.safeFloat (balance, 'balance');
+                }
+                result[symbol][code] = account;
             }
-            if (balance['type'] === 'trade') {
-                account['free'] = this.safeFloat (balance, 'balance');
-            }
-            if (balance['type'] === 'frozen') {
-                account['used'] = this.safeFloat (balance, 'balance');
-            }
-            if (balance['type'] == 'loan') {
-                account['borrowed'] = - this.safeFloat (balance, 'balance');
-            }
-            result[symbol][code] = account;
         }
         return this.parseBalance (result);
     }
@@ -708,7 +718,8 @@ module.exports = class huobipro extends Exchange {
             }
             accounts[code] = account;
         }
-        result['cross-margin'] = this.parseBalance(accounts)
+        result['cross-margin'] = this.parseBalance(accounts);
+        result['cross-margin']['risk_rate'] = this.safeString (response['data'], 'risk-rate');
         return result
     }
 
@@ -716,30 +727,32 @@ module.exports = class huobipro extends Exchange {
     async fetchBalance (params = {}) {
         await this.loadMarkets ();
         await this.loadAccounts ();
-        const accountType = this.safeString (params, 'type', 'spot');
+        let accountType = this.safeString (params, 'type', 'spot');
         if (accountType === 'cross-margin') {
-            accountType = 'super-margin'
+            accountType = 'super-margin';
         }
-        const method = this.options['fetchBalanceMethod'];
-        const request = {
-            // 'id': this.getAccountIDByType(accountType),
-        };
+        let method = undefined;
+        const request = {};
         switch (accountType) {
             case 'spot':
+                method = this.options['fetchBalanceMethod'];
                 request['id'] = this.getAccountIDByType(accountType);
                 break;
             case 'margin':
-                request['id'] = this.getAccountIDByType(accountType, this.marketId (this.safeString (params, 'symbol')));
+                method = this.options['fetchMarginBalanceMethod'];
+                if (params['symbol'] !== undefined) {
+                    request['id'] = this.getAccountIDByType(accountType, this.marketId (params['symbol']));
+                }
                 break;
             case 'super-margin':
-                request['id'] = this.getAccountIDByType(accountType);
+                method = this.options['fetchCrossMarginBalanceMethod'];
                 break;
         }
-        const response = await this[method] (this.extend (request, params));
+        const response = await this[method] (request);
         if (accountType === 'spot') {
             return this.parseSpotBalance(response);
         } else if (accountType === 'margin') {
-            return this.parseMarginBalance(response, this.safeString (params, 'symbol'));
+            return this.parseMarginBalance(response);
         } else if (accountType === 'super-margin') {
             return this.parseSuperMarginBalance(response)
         }

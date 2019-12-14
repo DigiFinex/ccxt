@@ -926,6 +926,15 @@ module.exports = class Exchange {
         throw new BadSymbol (this.id + ' does not have market symbol ' + symbol)
     }
 
+    marketSymbol(id) {
+        for (let key in this.markets) {
+            if (this.markets[key]['id'] == id) {
+                return key;
+            }
+        }
+        throw new BadSymbol (id + ' markets not loaded');
+    }
+
     marketId (symbol) {
         const market = this.market (symbol)
         return (market !== undefined ? market['id'] : symbol)
