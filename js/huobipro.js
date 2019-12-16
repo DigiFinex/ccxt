@@ -996,7 +996,7 @@ module.exports = class huobipro extends Exchange {
         await this.loadMarkets ();
         await this.loadAccounts ();
         const market = this.market (symbol);
-        const marginTrading = this.safeString (params, 'margin_trading', '1')
+        const marginTrading = this.safeString (params, 'margin_trading', '1');
         const request = {
             'account-id': this.getAccountIDByType(marginTrading === '1' ? 'spot' : 'margin', market['id']),
             'symbol': market['id'],

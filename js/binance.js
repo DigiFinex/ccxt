@@ -111,6 +111,7 @@ module.exports = class binance extends Exchange {
                         'margin/loan',
                         'margin/repay',
                         'margin/order',
+                        'margin/order/test',
                         'userDataStream',
                     ],
                     'put': [
@@ -379,7 +380,15 @@ module.exports = class binance extends Exchange {
 
     async fetchBalance (params = {}) {
         await this.loadMarkets ();
-        const response = await this.privateGetAccount (params);
+        if (params['type'] === 'margin') {
+            return await this.fetchMarginBalance();
+        } else {
+            return await this.fetchSpotBalance();
+        }
+    }
+
+    async fetchSpotBalance (params = {}) {
+        const response = await this.privateGetAccount ();
         const result = { 'info': response };
         const balances = this.safeValue (response, 'balances', []);
         for (let i = 0; i < balances.length; i++) {
@@ -392,6 +401,27 @@ module.exports = class binance extends Exchange {
             result[code] = account;
         }
         return this.parseBalance (result);
+    }
+
+    async fetchMarginBalance (params = {}) {
+        await this.loadMarkets ();
+        const response = await this.sapiGetMarginAccount ();
+        const result = { 'info': response };
+        const accounts = {};
+        const balances = this.safeValue (response, 'userAssets', []);
+        for (let i = 0; i < balances.length; i++) {
+            const balance = balances[i];
+            const currencyId = balance['asset'];
+            const code = this.safeCurrencyCode (currencyId);
+            const account = this.account ();
+            account['free'] = this.safeFloat (balance, 'free');
+            account['used'] = this.safeFloat (balance, 'locked');
+            account['borrowed'] = this.safeFloat (balance, 'borrowed');
+            accounts[code] = account;
+        }
+        result['cross-margin'] = this.parseBalance (accounts);
+        result['cross-margin']['risk_rate'] = this.safeFloat (response, 'marginLevel');
+        return result;
     }
 
     async fetchOrderBook (symbol, limit = undefined, params = {}) {
@@ -781,8 +811,14 @@ module.exports = class binance extends Exchange {
     async createOrder (symbol, type, side, amount, price = undefined, params = {}) {
         await this.loadMarkets ();
         const market = this.market (symbol);
+        const marginTrading = this.safeString (params, 'margin_trading', '1');
         // the next 5 lines are added to support for testing orders
-        let method = 'privatePostOrder';
+        let method = undefined;
+        if (marginTrading === '1') {
+            method = 'privatePostOrder';
+        } else {
+            method = 'sapiPostMarginOrder';
+        }
         const test = this.safeValue (params, 'test', false);
         if (test) {
             method += 'Test';
@@ -849,7 +885,13 @@ module.exports = class binance extends Exchange {
         } else {
             request['orderId'] = parseInt (id);
         }
-        const response = await this.privateGetOrder (this.extend (request, params));
+        let method = undefined;
+        if (params['type'] === 'margin') {
+            method = 'sapiGetMarginOrder';
+        } else {
+            method = 'privateGetOrder';
+        }
+        const response = await this[method] (this.extend (request, params));
         return this.parseOrder (response, market);
     }
 
@@ -907,13 +949,19 @@ module.exports = class binance extends Exchange {
             const fetchOpenOrdersRateLimit = parseInt (numSymbols / 2);
             throw new ExchangeError (this.id + ' fetchOpenOrders WARNING: fetching open orders without specifying a symbol is rate-limited to one call per ' + fetchOpenOrdersRateLimit.toString () + ' seconds. Do not call this method frequently to avoid ban. Set ' + this.id + '.options["warnOnFetchOpenOrdersWithoutSymbol"] = false to suppress this warning message.');
         }
-        const response = await this.privateGetOpenOrders (this.extend (request, params));
+        let method = undefined;
+        if (params['type'] === 'margin') {
+            method = 'sapiGetMarginOpenOrders';
+        } else {
+            method = 'privateGetOpenOrders';
+        }
+        const response = await this[method] (this.extend (request, params));
         return this.parseOrders (response, market, since, limit);
     }
 
     async fetchClosedOrders (symbol = undefined, since = undefined, limit = undefined, params = {}) {
         const orders = await this.fetchOrders (symbol, since, limit, params);
-        return this.filterBy (orders, 'status', 'closed');
+        return this.filterByArray (orders, 'status', [ 'closed', 'canceled' ], false);
     }
 
     async cancelOrder (id, symbol = undefined, params = {}) {
@@ -927,7 +975,13 @@ module.exports = class binance extends Exchange {
             'orderId': parseInt (id),
             // 'origClientOrderId': id,
         };
-        const response = await this.privateDeleteOrder (this.extend (request, params));
+        let method = undefined;
+        if (params['type'] === 'margin') {
+            method = 'sapiDeleteMarginOrder';
+        } else {
+            method = 'privateDeleteOrder';
+        }
+        const response = await this[method] (this.extend (request, params));
         return this.parseOrder (response);
     }
 
