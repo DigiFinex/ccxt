@@ -225,7 +225,7 @@ module.exports = class binance extends Exchange {
                 'defaultLimitOrderType': 'limit', // or 'limit_maker'
                 'hasAlreadyAuthenticatedSuccessfully': false,
                 'warnOnFetchOpenOrdersWithoutSymbol': true,
-                'recvWindow': 5 * 1000, // 5 sec, binance default
+                'recvWindow': 30 * 1000, // 5 sec, binance default
                 'timeDifference': 0, // the difference between system clock and Binance clock
                 'adjustForTimeDifference': false, // controls the adjustment logic upon instantiation
                 'parseOrderToPrecision': false, // force amounts and costs in parseOrder to precision
