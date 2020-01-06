@@ -1496,87 +1496,96 @@ module.exports = class okex3 extends Exchange {
         let method = undefined;
         let response = {};
         let holding = [];
+
         if (symbol == undefined) {
-            let method = type + 'GetPosition';
-            response = await this[method] ();
-            if (response.hasOwnProperty('holding') && response['holding'].hasOwnProperty(0)) {
-                holding = response['holding'][0];
+            if (type == 'futures') {
+                method = type + 'GetPosition';
+                response = await this[method] ();
+                for (var i of response['holding']) {
+                    for (var v of i) {
+                        holding.push(v)
+                    }
+                };
+            }
+            if (type == 'swap') {
+                method = type + 'GetPosition';
+                response = await this[method] ();
+                for (var i of response) {
+                    for (var v of i['holding']) {
+                        holding.push(v)
+                    }
+                };
             }
         } else {
             const request = {
                 'instrument_id': symbol,
             };
-            let method = type + 'GetInstrumentIdPosition';
+            method = type + 'GetInstrumentIdPosition';
             response = await this[method] (request);
             if (response.hasOwnProperty('holding')) {
                 holding = response['holding'];
             }
         }
-        // futures
-        // {
-        //     "long_qty": "0",
-        //     "long_avail_qty": "0",
-        //     "long_avg_cost": "0",
-        //     "long_settlement_price": "0",
-        //     "realised_pnl": "0",
-        //     "short_qty": "0",
-        //     "short_avail_qty": "0",
-        //     "short_avg_cost": "0",
-        //     "short_settlement_price": "0",
-        //     "liquidation_price": "0.00",
-        //     "instrument_id": "BTC-USD-191115",
-        //     "leverage": "100",
-        //     "created_at": "2019-11-12T07:33:02.563Z",
-        //     "updated_at": "2019-11-12T08:00:34.304Z",
-        //     "margin_mode": "crossed",
-        //     "short_margin": "0.0",
-        //     "short_pnl": "0.0",
-        //     "short_pnl_ratio": "0.0",
-        //     "short_unrealised_pnl": "0.0",
-        //     "long_margin": "0.0",
-        //     "long_pnl": "0.0",
-        //     "long_pnl_ratio": "100.0",
-        //     "long_unrealised_pnl": "0.0",
-        //     "long_settled_pnl": "0",
-        //     "short_settled_pnl": "0",
-        //     "last": "8744.67"
-        // }
+
         let data = [];
         let this_ = this;
-        holding.forEach(function (item, index) {
-            if (item['long_qty'] != 0) {
+
+        if (type == 'futures') {
+            holding.forEach(function (item, index) {
+                if (item['long_qty'] != 0) {
+                    data.push({
+                        "timestamp": this_.parse8601(this_.safeString(item, 'created_at')),
+                        "symbol": item['instrument_id'],
+                        "direction": "buy",
+                        "amount": item['long_qty'],
+                        "averagePrice": item['long_avg_cost'],
+                        "unrealisedPnl": item['long_unrealised_pnl'],
+                        "realisedPnl": item['long_pnl'],
+                        "liquidationPrice": item['liquidation_price'],
+                        "markPrice": item['last'],
+                        "indexPrice": item['last'],
+                        "lastPrice": item['last'],
+                        "positionMargin": item['long_margin'],
+                    });
+                }
+                if (item['short_qty'] != 0) {
+                    data.push({
+                        "timestamp": this_.parse8601(this_.safeString(item, 'created_at')),
+                        "symbol": item['instrument_id'],
+                        "direction": "sell",
+                        "amount": item['short_qty'],
+                        "averagePrice": item['short_avg_cost'],
+                        "unrealisedPnl": item['short_unrealised_pnl'],
+                        "realisedPnl": item['short_pnl'],
+                        "liquidationPrice": item['liquidation_price'],
+                        "markPrice": item['last'],
+                        "indexPrice": item['last'],
+                        "lastPrice": item['last'],
+                        "positionMargin": item['short_margin'],
+                    });
+                }
+            });
+        }
+
+        if (type == 'swap') {
+            holding.forEach(function (item, index) {
                 data.push({
-                    "timestamp": this_.parse8601 (this_.safeString (item, 'created_at')),
+                    "timestamp": this_.parse8601(this_.safeString(item, 'created_at')),
                     "symbol": item['instrument_id'],
-                    "direction": "buy",
-                    "amount": item['long_qty'],
-                    "averagePrice": item['long_avg_cost'],
-                    "unrealisedPnl": item['long_unrealised_pnl'],
-                    "realisedPnl": item['long_pnl'],
+                    "direction": item['side'] == 'long' ? 'buy' : 'sell',
+                    "amount": item['position'],
+                    "averagePrice": item['avg_cost'],
+                    "unrealisedPnl": '',
+                    "realisedPnl": item['realized_pnl'],
                     "liquidationPrice": item['liquidation_price'],
                     "markPrice": item['last'],
                     "indexPrice": item['last'],
                     "lastPrice": item['last'],
-                    "positionMargin": item['long_margin'],
+                    "positionMargin": item['margin'],
                 });
-            }
-            if (item['short_qty'] != 0) {
-                data.push({
-                    "timestamp": this_.parse8601 (this_.safeString (item, 'created_at')),
-                    "symbol": item['instrument_id'],
-                    "direction": "sell",
-                    "amount": item['short_qty'],
-                    "averagePrice": item['short_avg_cost'],
-                    "unrealisedPnl": item['short_unrealised_pnl'],
-                    "realisedPnl": item['short_pnl'],
-                    "liquidationPrice": item['liquidation_price'],
-                    "markPrice": item['last'],
-                    "indexPrice": item['last'],
-                    "lastPrice": item['last'],
-                    "positionMargin": item['short_margin'],
-                });
-            }
-        });
+            });
+        }
+
         return data;
     }
 
