@@ -2082,7 +2082,7 @@ module.exports = class okex3 extends Exchange {
                 }
             }
         }
-        return this.parseOrders (orders, market, since, limit);
+        return this.parseOrdersReversal (orders, market, since, limit, false);
     }
 
     async fetchOpenOrders (symbol = undefined, since = undefined, limit = undefined, params = {}) {

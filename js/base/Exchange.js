@@ -1200,6 +1200,18 @@ module.exports = class Exchange {
         return this.filterBySymbolSinceLimit (result, symbol, since, limit)
     }
 
+    // 处理某些与其他交易所排序不一样的情况
+    parseOrdersReversal (orders, market = undefined, since = undefined, limit = undefined, params = {}, desc = true) {
+        // this code is commented out temporarily to catch for exchange-specific errors
+        // if (!this.isArray (orders)) {
+        //     throw new ExchangeError (this.id + ' parseOrders expected an array in the orders argument, but got ' + typeof orders);
+        // }
+        let result = Object.values (orders).map (order => this.extend (this.parseOrder (order, market), params))
+        result = sortBy (result, 'timestamp' , desc)
+        const symbol = (market !== undefined) ? market['symbol'] : undefined
+        return this.filterBySymbolSinceLimit (result, symbol, since, limit)
+    }
+
     safeCurrencyCode (currencyId, currency = undefined) {
         let code = undefined
         if (currencyId !== undefined) {
