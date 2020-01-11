@@ -27,7 +27,7 @@ module.exports = class okex3 extends Exchange {
                 'fetchWithdrawals': true,
                 'fetchTime': true,
                 'fetchTransactions': false,
-                'fetchMyTrades': false, // they don't have it
+                'fetchMyTrades': true, // they don't have it
                 'fetchDepositAddress': true,
                 'fetchOrderTrades': true,
                 'fetchTickers': true,
@@ -2082,7 +2082,7 @@ module.exports = class okex3 extends Exchange {
                 }
             }
         }
-        return this.parseOrdersReversal (orders, market, since, limit, false);
+        return this.parseOrdersReversal (orders, market, since, limit, {}, true);
     }
 
     async fetchOpenOrders (symbol = undefined, since = undefined, limit = undefined, params = {}) {
@@ -2142,6 +2142,68 @@ module.exports = class okex3 extends Exchange {
             'tag': tag,
             'info': depositAddress,
         };
+    }
+
+    // ccxt 本身没有，自己定制的
+    async fetchMyTrades (symbol = undefined, since = undefined, limit = undefined, params = {}) {
+        // okex actually returns ledger entries instead of fills here, so each fill in the order
+        // is represented by two trades with opposite buy/sell sides, not one :\
+        // this aspect renders the 'fills' endpoint unusable for fetchOrderTrades
+        // until either OKEX fixes the API or we workaround this on our side somehow
+        if (symbol === undefined) {
+            throw new ArgumentsRequired (this.id + ' fetchMyTrades requires a symbol argument');
+        }
+        await this.loadMarkets ();
+        const market = this.market (symbol);
+        if ((limit === undefined) || (limit > 100)) {
+            limit = 100;
+        }
+        const request = {
+            'instrument_id': market['id'],
+            'limit': limit, // optional, number of results per request, default = maximum = 100
+        };
+        const type = this.safeString (params, 'type', market['type']);
+        const query = this.omit (params, 'type');
+        const method = type + 'GetFills';
+        const response = await this[method] (this.extend (request, query));
+        //
+        // spot trades, margin trades
+        //
+        //     [
+        //         {
+        //             "created_at":"2019-09-20T07:15:24.000Z",
+        //             "exec_type":"T",
+        //             "fee":"0",
+        //             "instrument_id":"ETH-USDT",
+        //             "ledger_id":"7173486113",
+        //             "liquidity":"T",
+        //             "order_id":"3553868136523776",
+        //             "price":"217.59",
+        //             "product_id":"ETH-USDT",
+        //             "side":"sell",
+        //             "size":"0.04619899",
+        //             "timestamp":"2019-09-20T07:15:24.000Z"
+        //         }
+        //     ]
+        //
+        // futures trades, swap trades
+        //
+        //     [
+        //         {
+        //             "trade_id":"197429674631450625",
+        //             "instrument_id":"EOS-USD-SWAP",
+        //             "order_id":"6a-7-54d663a28-0",
+        //             "price":"3.633",
+        //             "order_qty":"1.0000",
+        //             "fee":"-0.000551",
+        //             "created_at":"2019-03-21T04:41:58.0Z", // missing in swap trades
+        //             "timestamp":"2019-03-25T05:56:31.287Z", // missing in futures trades
+        //             "exec_type":"M", // whether the order is taker or maker
+        //             "side":"short", // "buy" in futures trades
+        //         }
+        //     ]
+        //
+        return this.parseTradesReversal (response, market, since, limit, {}, true);
     }
 
     async fetchDepositAddress (code, params = {}) {
