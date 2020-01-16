@@ -578,8 +578,8 @@ module.exports = class ftx extends Exchange {
         let symbol = undefined;
         if (marketId !== undefined) {
             if (marketId in this.markets_by_id) {
-                market = this.markets_by_id;
-                symbol = market['symbol'];
+                //market = this.markets_by_id;
+                symbol = market['id'];
             } else {
                 const base = this.safeCurrencyCode (this.safeString (trade, 'baseCurrency'));
                 const quote = this.safeCurrencyCode (this.safeString (trade, 'quoteCurrency'));
