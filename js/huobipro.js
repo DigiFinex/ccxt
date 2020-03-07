@@ -407,6 +407,9 @@ module.exports = class huobipro extends Exchange {
             let symbol = marketId;
             if (market !== undefined) {
                 symbol = market['symbol'];
+                if (symbols !== undefined && symbols !== symbol) {
+                    continue;
+                }
                 const ticker = this.parseTicker (tickers[i], market);
                 ticker['timestamp'] = timestamp;
                 ticker['datetime'] = this.iso8601 (timestamp);

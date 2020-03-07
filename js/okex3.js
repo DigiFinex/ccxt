@@ -842,6 +842,9 @@ module.exports = class okex3 extends Exchange {
         for (let i = 0; i < response.length; i++) {
             const ticker = this.parseTicker (response[i]);
             const symbol = ticker['symbol'];
+            if (symbols !== undefined && symbols !== symbol) {
+                continue;
+            }
             result[symbol] = ticker;
         }
         return result;
