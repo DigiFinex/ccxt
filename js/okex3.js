@@ -14,6 +14,8 @@ module.exports = class okex3 extends Exchange {
             'name': 'OKEX',
             'countries': [ 'CN', 'US' ],
             'version': 'v3',
+            'candlesTotalLimit': 1440,
+            'candlesOnceLimit': 200,
             'rateLimit': 1000, // up to 3000 requests per 5 minutes ≈ 600 requests per minute ≈ 10 requests per second ≈ 100 ms
             'has': {
                 'CORS': false,
@@ -1078,7 +1080,18 @@ module.exports = class okex3 extends Exchange {
             'granularity': this.timeframes[timeframe],
         };
         if (since !== undefined) {
-            request['start'] = this.iso8601 (since);
+            const sinceTime = parseInt (since);
+            const duration = parseInt(this.timeframes[timeframe]);
+            request['start'] = this.iso8601 (sinceTime);
+            if (limit !== undefined) {
+                let requestLimit = parseInt(limit);
+                if (requestLimit > this.candlesOnceLimit) {
+                    requestLimit = this.candlesOnceLimit
+                }
+                request['end'] = this.iso8601 (sinceTime + 1000*requestLimit*duration);
+            } else {
+                request['end'] = this.iso8601 (sinceTime + 1000*this.candlesOnceLimit*duration);
+            }
         }
         const response = await this[method] (this.extend (request, params));
         //
