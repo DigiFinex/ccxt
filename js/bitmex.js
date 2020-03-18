@@ -167,6 +167,10 @@ module.exports = class bitmex extends Exchange {
             const market = response[i];
             const active = (market['state'] !== 'Unlisted');
             const id = market['symbol'];
+            // 过滤.开头的指数信息
+            if (id.indexOf('.') == 0){
+                continue;
+            }
             const baseId = market['underlying'];
             const quoteId = market['quoteCurrency'];
             const basequote = baseId + quoteId;
@@ -751,8 +755,23 @@ module.exports = class bitmex extends Exchange {
         await this.loadMarkets ();
         const response = await this.publicGetInstrumentActiveAndIndices (params);
         const result = {};
+        const type = this.safeString (params, 'type');
+        let requireType = undefined;
+        switch (type) {
+            case 'spot':
+                return result;
+            case 'futures':
+                requireType = 'FFCCSX';
+                break;
+            case 'swap':
+                requireType = 'FFWCSX';
+                break;
+        }
         for (let i = 0; i < response.length; i++) {
             const ticker = this.parseTicker (response[i]);
+            if (requireType != undefined && requireType != ticker['info']['typ']){
+                continue;
+            }
             const symbol = this.safeString (ticker, 'symbol');
             if (symbol !== undefined) {
                 result[symbol] = ticker;
