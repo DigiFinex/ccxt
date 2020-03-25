@@ -382,6 +382,8 @@ module.exports = class binance extends Exchange {
         await this.loadMarkets ();
         if (params['type'] === 'margin') {
             return await this.fetchMarginBalance();
+        } else if (params['type'] === 'swap') {
+            return await this.fetchSwapBalance();
         } else {
             return await this.fetchSpotBalance();
         }
@@ -422,6 +424,24 @@ module.exports = class binance extends Exchange {
         result['cross-margin'] = this.parseBalance (accounts);
         result['cross-margin']['risk_rate'] = this.safeFloat (response, 'marginLevel');
         return result;
+    }
+
+    // add
+    async fetchSwapBalance (params = {}) {
+        await this.loadMarkets ();
+        const response = await this.fapiPrivateGetAccount ();
+        const result = { 'info': response };
+        const balances = this.safeValue (response, 'assets', []);
+        for (let i = 0; i < balances.length; i++) {
+            const balance = balances[i];
+            const code = balance['asset'];
+            const account = this.account ();
+            account['used'] = this.safeFloat (balance, 'positionInitialMargin');
+            account['total'] = this.safeFloat (balance, 'marginBalance');
+            account['margin_ratio'] = "";
+            result[code] = account;
+        }
+        return this.parseBalance (result);
     }
 
     async fetchOrderBook (symbol, limit = undefined, params = {}) {
