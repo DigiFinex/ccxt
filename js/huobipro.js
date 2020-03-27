@@ -307,22 +307,10 @@ module.exports = class huobipro extends Exchange {
             symbol = market['symbol'];
         }
         const timestamp = this.safeInteger (ticker, 'ts');
-        let bid = undefined;
-        let ask = undefined;
-        let bidVolume = undefined;
-        let askVolume = undefined;
-        if ('bid' in ticker) {
-            if (Array.isArray (ticker['bid'])) {
-                bid = this.safeFloat (ticker['bid'], 0);
-                bidVolume = this.safeFloat (ticker['bid'], 1);
-            }
-        }
-        if ('ask' in ticker) {
-            if (Array.isArray (ticker['ask'])) {
-                ask = this.safeFloat (ticker['ask'], 0);
-                askVolume = this.safeFloat (ticker['ask'], 1);
-            }
-        }
+        let bid = this.safeFloat (ticker, 'bid');
+        let ask = this.safeFloat (ticker, 'ask');
+        let bidVolume = this.safeFloat (ticker, 'bidSize');
+        let askVolume = this.safeFloat (ticker, 'askSize')
         const open = this.safeFloat (ticker, 'open');
         const close = this.safeFloat (ticker, 'close');
         let change = undefined;
