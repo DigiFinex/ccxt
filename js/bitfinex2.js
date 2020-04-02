@@ -102,6 +102,7 @@ module.exports = class bitfinex2 extends bitfinex {
                 'private': {
                     'post': [
                         'auth/r/wallets',
+                        'auth/r/wallets/hist',
                         'auth/r/orders/{symbol}',
                         'auth/r/orders/{symbol}/new',
                         'auth/r/orders/{symbol}/hist',
@@ -268,6 +269,47 @@ module.exports = class bitfinex2 extends bitfinex {
             });
         }
         return result;
+    }
+
+    // add
+    async fetchWalletsHistory (end) {
+        const request = {
+            'end': end,
+        };
+        const response = await this.privatePostAuthRWalletsHist (request);
+        const result = [];
+        for (let b = 0; b < response.length; b++) {
+            const balance = response[b];
+            const accountType = balance[0];
+            let currency = balance[1];
+            const total = balance[2];
+            const available = balance[4];
+            const timestamp = balance[6];
+            if (currency[0] === 't') {
+                currency = currency.slice(1);
+            }
+            const code = this.safeCurrencyCode(currency);
+            const account = this.account();
+            // do not fill in zeroes and missing values in the parser
+            // rewrite and unify the following to use the unified parseBalance
+            account['total'] = total;
+            account['timestamp'] = timestamp;
+            account['currency'] = code;
+            account['type'] = accountType;
+            if (!available) {
+                if (available === 0) {
+                    account['free'] = 0;
+                    account['used'] = total;
+                } else {
+                    account['free'] = total;
+                }
+            } else {
+                account['free'] = available;
+                account['used'] = account['total'] - account['free'];
+            }
+            result.push(account);
+        }
+        return this.parseBalance (result)
     }
 
     async fetchBalance (params = {}) {
