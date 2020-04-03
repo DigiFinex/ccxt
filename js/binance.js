@@ -59,6 +59,7 @@ module.exports = class binance extends Exchange {
                     'wapi': 'https://api.binance.com/wapi/v3',
                     'sapi': 'https://api.binance.com/sapi/v1',
                     'fapiPrivate': 'https://fapi.binance.com/fapi/v1',
+                    'fapiPublic': 'https://fapi.binance.com/fapi/v1',
                     'public': 'https://api.binance.com/api/v3',
                     'private': 'https://api.binance.com/api/v3',
                     'v3': 'https://api.binance.com/api/v3',
@@ -140,6 +141,11 @@ module.exports = class binance extends Exchange {
                         'sub-account/list',
                         'sub-account/transfer/history',
                         'sub-account/assets',
+                    ],
+                },
+                'fapiPublic': {
+                    'get': [
+                        'ticker/24hr',
                     ],
                 },
                 'fapiPrivate': {
@@ -526,8 +532,13 @@ module.exports = class binance extends Exchange {
 
     async fetchTickers (symbols = undefined, params = {}) {
         await this.loadMarkets ();
-        const method = this.options['fetchTickersMethod'];
-        const response = await this[method] (params);
+        let method = undefined;
+        if (params['type'] === 'spot') {
+            method = 'publicGetTicker24hr';
+        } else if (params['type'] === 'futures') {
+            method = 'fapiPublicGetTicker24hr';
+        }
+        const response = await this[method] ();
         return this.parseTickers (response, symbols);
     }
 
