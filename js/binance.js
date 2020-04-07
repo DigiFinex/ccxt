@@ -146,6 +146,7 @@ module.exports = class binance extends Exchange {
                 'fapiPublic': {
                     'get': [
                         'ticker/24hr',
+                        'exchangeInfo',
                     ],
                 },
                 'fapiPrivate': {
@@ -278,88 +279,99 @@ module.exports = class binance extends Exchange {
     }
 
     async fetchMarkets (params = {}) {
-        const response = await this.publicGetExchangeInfo (params);
         if (this.options['adjustForTimeDifference']) {
             await this.loadTimeDifference ();
         }
-        const markets = this.safeValue (response, 'symbols');
         const result = [];
-        for (let i = 0; i < markets.length; i++) {
-            const market = markets[i];
-            const id = this.safeString (market, 'symbol');
-            // "123456" is a "test symbol/market"
-            if (id === '123456') {
-                continue;
+        for (let i = 0; i < 2; i++) {
+            let response = {}
+            if (i == 0) {
+                response = await this.publicGetExchangeInfo(params);
+            } else {
+                response = await this.fapiPublicGetExchangeInfo(params);
             }
-            const baseId = market['baseAsset'];
-            const quoteId = market['quoteAsset'];
-            const base = this.safeCurrencyCode (baseId);
-            const quote = this.safeCurrencyCode (quoteId);
-            const symbol = base + '/' + quote;
-            const filters = this.indexBy (market['filters'], 'filterType');
-            const precision = {
-                'base': market['baseAssetPrecision'],
-                'quote': market['quotePrecision'],
-                'amount': market['baseAssetPrecision'],
-                'price': market['quotePrecision'],
-            };
-            const status = this.safeString (market, 'status');
-            const active = (status === 'TRADING');
-            const entry = {
-                'id': id,
-                'symbol': symbol,
-                'base': base,
-                'quote': quote,
-                'baseId': baseId,
-                'quoteId': quoteId,
-                'info': market,
-                'active': active,
-                'precision': precision,
-                'limits': {
-                    'amount': {
-                        'min': Math.pow (10, -precision['amount']),
-                        'max': undefined,
-                    },
-                    'price': {
-                        'min': undefined,
-                        'max': undefined,
-                    },
-                    'cost': {
-                        'min': -1 * Math.log10 (precision['amount']),
-                        'max': undefined,
-                    },
-                },
-            };
-            if ('PRICE_FILTER' in filters) {
-                const filter = filters['PRICE_FILTER'];
-                // PRICE_FILTER reports zero values for maxPrice
-                // since they updated filter types in November 2018
-                // https://github.com/ccxt/ccxt/issues/4286
-                // therefore limits['price']['max'] doesn't have any meaningful value except undefined
-                entry['limits']['price'] = {
-                    'min': this.safeFloat (filter, 'minPrice'),
-                    'max': undefined,
-                };
-                const maxPrice = this.safeFloat (filter, 'maxPrice');
-                if ((maxPrice !== undefined) && (maxPrice > 0)) {
-                    entry['limits']['price']['max'] = maxPrice;
+            let markets = this.safeValue(response, 'symbols');
+            for (let i = 0; i < markets.length; i++) {
+                const market = markets[i];
+                const id = this.safeString(market, 'symbol');
+                // "123456" is a "test symbol/market"
+                if (id === '123456') {
+                    continue;
                 }
-                entry['precision']['price'] = this.precisionFromString (filter['tickSize']);
-            }
-            if ('LOT_SIZE' in filters) {
-                const filter = this.safeValue (filters, 'LOT_SIZE', {});
-                const stepSize = this.safeString (filter, 'stepSize');
-                entry['precision']['amount'] = this.precisionFromString (stepSize);
-                entry['limits']['amount'] = {
-                    'min': this.safeFloat (filter, 'minQty'),
-                    'max': this.safeFloat (filter, 'maxQty'),
+                const baseId = market['baseAsset'];
+                const quoteId = market['quoteAsset'];
+                const base = this.safeCurrencyCode(baseId);
+                const quote = this.safeCurrencyCode(quoteId);
+                const symbol = base + '/' + quote;
+                const filters = this.indexBy(market['filters'], 'filterType');
+                const precision = {
+                    'base': market['baseAssetPrecision'],
+                    'quote': market['quotePrecision'],
+                    'amount': market['baseAssetPrecision'],
+                    'price': market['quotePrecision'],
                 };
+                const status = this.safeString(market, 'status');
+                const active = (status === 'TRADING');
+                const entry = {
+                    'id': id,
+                    'symbol': symbol,
+                    'base': base,
+                    'quote': quote,
+                    'baseId': baseId,
+                    'quoteId': quoteId,
+                    'info': market,
+                    'active': active,
+                    'precision': precision,
+                    'type': (i == 0 ? 'spot' : 'swap'),
+                    'limits': {
+                        'amount': {
+                            'min': Math.pow(10, -precision['amount']),
+                            'max': undefined,
+                        },
+                        'price': {
+                            'min': undefined,
+                            'max': undefined,
+                        },
+                        'cost': {
+                            'min': -1 * Math.log10(precision['amount']),
+                            'max': undefined,
+                        },
+                    },
+                };
+                if ('PRICE_FILTER' in filters) {
+                    const filter = filters['PRICE_FILTER'];
+                    // PRICE_FILTER reports zero values for maxPrice
+                    // since they updated filter types in November 2018
+                    // https://github.com/ccxt/ccxt/issues/4286
+                    // therefore limits['price']['max'] doesn't have any meaningful value except undefined
+                    entry['limits']['price'] = {
+                        'min': this.safeFloat(filter, 'minPrice'),
+                        'max': undefined,
+                    };
+                    const maxPrice = this.safeFloat(filter, 'maxPrice');
+                    if ((maxPrice !== undefined) && (maxPrice > 0)) {
+                        entry['limits']['price']['max'] = maxPrice;
+                    }
+                    entry['precision']['price'] = this.precisionFromString(filter['tickSize']);
+                }
+                if ('LOT_SIZE' in filters) {
+                    const filter = this.safeValue(filters, 'LOT_SIZE', {});
+                    const stepSize = this.safeString(filter, 'stepSize');
+                    entry['precision']['amount'] = this.precisionFromString(stepSize);
+                    entry['limits']['amount'] = {
+                        'min': this.safeFloat(filter, 'minQty'),
+                        'max': this.safeFloat(filter, 'maxQty'),
+                    };
+                }
+                if ('MIN_NOTIONAL' in filters) {
+                    entry['limits']['cost']['min'] = this.safeFloat(filters['MIN_NOTIONAL'], 'minNotional');
+                }
+                result.push(entry);
             }
-            if ('MIN_NOTIONAL' in filters) {
-                entry['limits']['cost']['min'] = this.safeFloat (filters['MIN_NOTIONAL'], 'minNotional');
-            }
-            result.push (entry);
         }
+
+        console.log(result)
+
         return result;
     }
 
