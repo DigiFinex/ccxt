@@ -147,6 +147,9 @@ module.exports = class binance extends Exchange {
                     'get': [
                         'ticker/24hr',
                         'exchangeInfo',
+                        'order',
+                        'openOrders',
+                        'allOrders',
                     ],
                 },
                 'fapiPrivate': {
@@ -369,9 +372,6 @@ module.exports = class binance extends Exchange {
                 result.push(entry);
             }
         }
-
-        console.log(result)
-
         return result;
     }
 
@@ -953,7 +953,13 @@ module.exports = class binance extends Exchange {
         if (limit !== undefined) {
             request['limit'] = limit;
         }
-        const response = await this.privateGetAllOrders (this.extend (request, params));
+        let method = undefined;
+        if (params['type'] === undefined || params['type'] === 'spot') {
+            method = 'privateGetAllOrders';
+        } else if (params['type'] === 'swap') {
+            method = 'fapiPrivateGetAllOrders';
+        }
+        const response = await this[method] (this.extend (request));
         //
         //     [
         //         {
@@ -993,12 +999,14 @@ module.exports = class binance extends Exchange {
             throw new ExchangeError (this.id + ' fetchOpenOrders WARNING: fetching open orders without specifying a symbol is rate-limited to one call per ' + fetchOpenOrdersRateLimit.toString () + ' seconds. Do not call this method frequently to avoid ban. Set ' + this.id + '.options["warnOnFetchOpenOrdersWithoutSymbol"] = false to suppress this warning message.');
         }
         let method = undefined;
-        if (params['type'] === 'margin') {
-            method = 'sapiGetMarginOpenOrders';
-        } else {
+        if (params['type'] === undefined || params['type'] === 'spot') {
             method = 'privateGetOpenOrders';
+        } else if (params['type'] === 'margin') {
+            method = 'sapiGetMarginOpenOrders';
+        } else if (params['type'] === 'swap') {
+            method = 'fapiPrivateGetOpenOrders';
         }
-        const response = await this[method] (this.extend (request, params));
+        const response = await this[method] (this.extend (request));
         return this.parseOrders (response, market, since, limit);
     }
 
