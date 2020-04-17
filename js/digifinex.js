@@ -20,6 +20,7 @@ module.exports = class digifinex extends Exchange {
                 'fetchOrders': true,
                 'fetchOHLCV': true,
                 'fetchOpenOrders': true,
+                'fetchClosedOrders': true,
                 'fetchOrder': true,
                 'fetchTickers': true,
                 'fetchMyTrades': true,
@@ -38,10 +39,10 @@ module.exports = class digifinex extends Exchange {
             },
             'urls': {
                 'logo': 'https://user-images.githubusercontent.com/1294454/62184319-304e8880-b366-11e9-99fe-8011d6929195.jpg',
-                'api': 'https://openapi.digifinex.vip',
-                'www': 'https://www.digifinex.vip',
+                'api': 'https://openapi.digifinex.xyz',
+                'www': 'https://www.digifinex.xyz',
                 'doc': [
-                    'https://docs.digifinex.vip',
+                    'https://docs.digifinex.xyz',
                 ],
                 'fees': 'https://digifinex.zendesk.com/hc/en-us/articles/360000328482-Fee-Structure-on-DigiFinex',
                 'referral': 'https://www.digifinex.vip/en-ww/from/DhOzBg/3798****5114',
@@ -892,6 +893,18 @@ module.exports = class digifinex extends Exchange {
         //
         const data = this.safeValue (response, 'data', []);
         return this.parseOrders (data, market, since, limit);
+    }
+
+    // add
+    async fetchClosedOrders (symbol = undefined, since = undefined, limit = undefined, params = {}) {
+        let result = await this.fetchOrders(symbol, since, limit, params);
+        let newResult = [];
+        for (var i = 0; i < result.length; i++) {
+            if (result[i]["status"] == "closed" || result[i]["status"] == "canceled") {
+                newResult.push(result[i]);
+            }
+        }
+        return newResult;
     }
 
     async fetchOrders (symbol = undefined, since = undefined, limit = undefined, params = {}) {
