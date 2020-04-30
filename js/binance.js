@@ -545,9 +545,10 @@ module.exports = class binance extends Exchange {
     async fetchTickers (symbols = undefined, params = {}) {
         await this.loadMarkets ();
         let method = undefined;
-        if (params['type'] === 'spot') {
+        const type = this.safeString (params, 'type', 'spot');
+        if (type === 'spot') {
             method = 'publicGetTicker24hr';
-        } else if (params['type'] === 'swap') {
+        } else if (type === 'swap') {
             method = 'fapiPublicGetTicker24hr';
         }
         const response = await this[method] ();
