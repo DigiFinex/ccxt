@@ -557,7 +557,7 @@ module.exports = class okex3 extends Exchange {
             marketType = 'swap';
             spot = false;
             swap = true;
-            baseId = this.safeString (market, 'coin');
+            baseId = this.safeString (market, 'underlying_index');
             const futuresAlias = this.safeString (market, 'alias');
             if (futuresAlias !== undefined) {
                 swap = false;
