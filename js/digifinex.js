@@ -999,6 +999,7 @@ module.exports = class digifinex extends Exchange {
         let market = undefined;
         const request = {
             'market': orderType,
+            'start_time': parseInt(new Date().getTime()/1000) - 3600 * 6,
         };
         if (symbol !== undefined) {
             market = this.market (symbol);
