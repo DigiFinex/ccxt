@@ -1031,7 +1031,7 @@ module.exports = class digifinex extends Exchange {
         //     }
         //
         const data = this.safeValue (response, 'list', []);
-        return this.parseTrades (data, market, since, limit);
+        return this.parseTradesReversal (data, market, since, limit);
     }
 
     parseLedgerEntryType (type) {
