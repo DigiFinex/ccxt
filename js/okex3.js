@@ -1368,9 +1368,14 @@ module.exports = class okex3 extends Exchange {
             throw new ArgumentsRequired (this.id + " fetchBalance requires a type parameter (one of 'account', 'spot', 'margin', 'futures', 'swap')");
         }
         const suffix = (type === 'account') ? 'Wallet' : 'Accounts';
-        const method = type + 'Get' + suffix;
+        let method = type + 'Get';
+        let instrumentID = this.safeString (params, 'instrument_id');
+        if (instrumentID != '') {
+            method += 'InstrumentId';
+        }
+        method += suffix;
         const query = this.omit (params, 'type');
-        const response = await this[method] (query);
+        let response = await this[method] (query);
         //
         // account
         //
@@ -1496,6 +1501,11 @@ module.exports = class okex3 extends Exchange {
         //         ]
         //     }
         //
+
+        if (instrumentID != '') {
+            response['info'] = [response['info']];
+        }
+
         if ((type === 'account') || (type === 'spot')) {
             return this.parseAccountBalance (response);
         } else if (type === 'margin') {
