@@ -1370,7 +1370,9 @@ module.exports = class okex3 extends Exchange {
         const suffix = (type === 'account') ? 'Wallet' : 'Accounts';
         let method = type + 'Get';
         let instrumentID = this.safeString (params, 'instrument_id');
-        if (instrumentID != '') {
+        if (instrumentID != '' && typeof(instrumentID) != "undefined") {
+            console.log(typeof(instrumentID))
+            console.log(instrumentID)
             method += 'InstrumentId';
         }
         method += suffix;
@@ -1502,7 +1504,7 @@ module.exports = class okex3 extends Exchange {
         //     }
         //
 
-        if (instrumentID != '') {
+        if (instrumentID != '' && typeof(instrumentID) != "undefined") {
             response['info'] = [response['info']];
         }
 
