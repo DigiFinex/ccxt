@@ -5,11 +5,21 @@
 const Exchange = require ('./base/Exchange');
 const { ExchangeError, ArgumentsRequired, ExchangeNotAvailable, InsufficientFunds, OrderNotFound, InvalidOrder, DDoSProtection, InvalidNonce, AuthenticationError, InvalidAddress } = require ('./base/errors');
 const { ROUND } = require ('./base/functions/number');
+var process = require('process');
 
 //  ---------------------------------------------------------------------------
 
 module.exports = class binance extends Exchange {
     describe () {
+        let dapiUrl, fapiUrl;
+        if (process.env.env == 'test') {
+            dapiUrl = 'https://testnet.binancefuture.com/dapi/v1';
+            fapiUrl = 'https://testnet.binancefuture.com/fapi/v1';
+        } else {
+            dapiUrl = 'https://dapi.binance.com/dapi/v1';
+            fapiUrl = 'https://fapi.binance.com/fapi/v1';
+        }
+
         return this.deepExtend (super.describe (), {
             'id': 'binance',
             'name': 'Binance',
@@ -58,8 +68,10 @@ module.exports = class binance extends Exchange {
                     'web': 'https://www.binance.com',
                     'wapi': 'https://api.binance.com/wapi/v3',
                     'sapi': 'https://api.binance.com/sapi/v1',
-                    'fapiPrivate': 'https://fapi.binance.com/fapi/v1',
-                    'fapiPublic': 'https://fapi.binance.com/fapi/v1',
+                    'dapiPrivate': dapiUrl,
+                    'dapiPublic': dapiUrl,
+                    'fapiPrivate': fapiUrl,
+                    'fapiPublic': fapiUrl,
                     'public': 'https://api.binance.com/api/v3',
                     'private': 'https://api.binance.com/api/v3',
                     'v3': 'https://api.binance.com/api/v3',
@@ -153,6 +165,32 @@ module.exports = class binance extends Exchange {
                     ],
                 },
                 'fapiPrivate': {
+                    'get': [
+                        'allOrders',
+                        'openOrders',
+                        'order',
+                        'account',
+                        'balance',
+                        'positionRisk',
+                        'userTrades',
+                    ],
+                    'post': [
+                        'order',
+                    ],
+                    'delete': [
+                        'order',
+                    ],
+                },
+                'dapiPublic': {
+                    'get': [
+                        'ticker/24hr',
+                        'exchangeInfo',
+                        'order',
+                        'openOrders',
+                        'allOrders',
+                    ],
+                },
+                'dapiPrivate': {
                     'get': [
                         'allOrders',
                         'openOrders',
@@ -286,14 +324,25 @@ module.exports = class binance extends Exchange {
             await this.loadTimeDifference ();
         }
         const result = [];
-        for (let i = 0; i < 2; i++) {
+        for (let t = 0; t < 3; t++) {
             let response = {}
-            if (i == 0) {
+            let type;
+            switch (t) {
+            case 0:
                 response = await this.publicGetExchangeInfo(params);
-            } else {
+                type = 'spot';
+                break;
+            case 1:
                 response = await this.fapiPublicGetExchangeInfo(params);
+                type = 'swap';
+                break;
+            case 2:
+                response = await this.dapiPublicGetExchangeInfo(params);
+                type = 'futures';
+                break;
             }
             let markets = this.safeValue(response, 'symbols');
+            //console.log (markets);
             for (let i = 0; i < markets.length; i++) {
                 const market = markets[i];
                 const id = this.safeString(market, 'symbol');
@@ -305,7 +354,12 @@ module.exports = class binance extends Exchange {
                 const quoteId = market['quoteAsset'];
                 const base = this.safeCurrencyCode(baseId);
                 const quote = this.safeCurrencyCode(quoteId);
-                const symbol = base + '/' + quote;
+                let symbol;
+                if (t == 0) {
+                    symbol = base + '/' + quote;
+                } else {
+                    symbol = id;
+                }
                 const filters = this.indexBy(market['filters'], 'filterType');
                 const precision = {
                     'base': market['baseAssetPrecision'],
@@ -325,10 +379,10 @@ module.exports = class binance extends Exchange {
                     'info': market,
                     'active': active,
                     'precision': precision,
-                    'type': (i == 0 ? 'spot' : 'swap'),
+                    'type': type,
                     'limits': {
                         'amount': {
-                            'min': Math.pow(10, -precision['amount']),
+                            'min': t == 0 ? Math.pow(10, -precision['amount']) : 1,
                             'max': undefined,
                         },
                         'price': {
@@ -336,7 +390,7 @@ module.exports = class binance extends Exchange {
                             'max': undefined,
                         },
                         'cost': {
-                            'min': -1 * Math.log10(precision['amount']),
+                            'min': t == 0 ? -1 * Math.log10(precision['amount']) : undefined,
                             'max': undefined,
                         },
                     },
