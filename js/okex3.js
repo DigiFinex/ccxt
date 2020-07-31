@@ -2889,6 +2889,14 @@ module.exports = class okex3 extends Exchange {
             const signature = this.hmac (this.encode (auth), this.encode (this.secret), 'sha256', 'base64');
             headers['OK-ACCESS-SIGN'] = this.decode (signature);
         }
+        // ok testnet
+        if(process.env.env == 'test'){
+            if(typeof headers == 'undefined'){
+                headers = {'x-simulated-trading': 1};
+            }else{
+                headers['x-simulated-trading'] = 1;
+            }
+        }
         return { 'url': url, 'method': method, 'body': body, 'headers': headers };
     }
 
