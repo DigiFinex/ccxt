@@ -2890,10 +2890,10 @@ module.exports = class okex3 extends Exchange {
             headers['OK-ACCESS-SIGN'] = this.decode (signature);
         }
         // ok testnet
-        if(process.env.env == 'test'){
-            if(typeof headers == 'undefined'){
+        if (process.env.env == 'test' || process.env.acts_test_okex3 == '1') {
+            if (typeof headers == 'undefined') {
                 headers = {'x-simulated-trading': 1};
-            }else{
+            } else {
                 headers['x-simulated-trading'] = 1;
             }
         }
