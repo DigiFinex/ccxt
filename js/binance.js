@@ -326,19 +326,19 @@ module.exports = class binance extends Exchange {
         const result = [];
         for (let t = 0; t < 3; t++) {
             let response = {}
-            let type;
+            //let type;
             switch (t) {
             case 0:
                 response = await this.publicGetExchangeInfo(params);
-                type = 'spot';
+                //type = 'spot';
                 break;
             case 1:
                 response = await this.fapiPublicGetExchangeInfo(params);
-                type = 'swap';
+                //type = 'swap';
                 break;
             case 2:
                 response = await this.dapiPublicGetExchangeInfo(params);
-                type = 'futures';
+                //type = 'futures';
                 break;
             }
             let markets = this.safeValue(response, 'symbols');
@@ -350,6 +350,7 @@ module.exports = class binance extends Exchange {
                 const quoteId = market['quoteAsset'];
                 const base = this.safeCurrencyCode(baseId);
                 const quote = this.safeCurrencyCode(quoteId);
+                let symbolType = t == 0 ? 'spot' : market['contractType'] === 'PERPETUAL' || market['contractType'] === undefined ? 'swap' : 'futures';
                 let symbol;
                 if (t == 0) {
                     symbol = base + '/' + quote;
@@ -375,7 +376,7 @@ module.exports = class binance extends Exchange {
                     'info': market,
                     'active': active,
                     'precision': precision,
-                    'type': type,
+                    'type': symbolType,
                     'limits': {
                         'amount': {
                             'min': t == 0 ? Math.pow(10, -precision['amount']) : 1,
