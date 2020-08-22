@@ -1334,6 +1334,9 @@ module.exports = class ftx extends Exchange {
             }
             const signature = this.hmac (this.encode (auth), this.encode (this.secret), 'sha256');
             headers['FTX-SIGN'] = signature;
+            if (typeof this.customHeaders['ftx-subaccount'] != 'undefined') {
+                headers['FTX-SUBACCOUNT'] = this.customHeaders['ftx-subaccount'];
+            }
         }
         return { 'url': url, 'method': method, 'body': body, 'headers': headers };
     }
