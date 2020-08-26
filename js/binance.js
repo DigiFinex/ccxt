@@ -350,7 +350,22 @@ module.exports = class binance extends Exchange {
                 const quoteId = market['quoteAsset'];
                 const base = this.safeCurrencyCode(baseId);
                 const quote = this.safeCurrencyCode(quoteId);
-                let symbolType = t == 0 ? 'spot' : market['contractType'] === 'PERPETUAL' || market['contractType'] === undefined ? 'swap' : 'futures';
+                let symbolType;
+                if (t === 0) {
+                    symbolType = 'spot';
+                } else {
+                    switch (market['contractType']) {
+                        case 'PERPETUAL':
+                        case undefined:
+                            symbolType = 'swap';
+                            break;
+                        case '':
+                            continue; // 未上线的交易对
+                        default:
+                            symbolType = 'futures';
+                            break;
+                    }
+                }
                 let symbol;
                 if (t == 0) {
                     symbol = base + '/' + quote;
