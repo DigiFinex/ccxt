@@ -2921,7 +2921,7 @@ module.exports = class okex3 extends Exchange {
             this.throwBroadlyMatchedException (this.exceptions['broad'], message, feedback);
         }
         this.throwExactlyMatchedException (this.exceptions['exact'], errorCode, feedback);
-        if (message !== undefined) {
+        if (message !== undefined && message !== "") {
             throw new ExchangeError (feedback); // unknown message
         }
     }

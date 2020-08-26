@@ -273,6 +273,7 @@ module.exports = class Exchange {
         this.walletAddress = undefined // a wallet address "0x"-prefixed hexstring
         this.token         = undefined // reserved for HTTP auth in some cases
 
+        this.customHeaders = {}
         this.balance     = {}
         this.orderbooks  = {}
         this.tickers     = {}
