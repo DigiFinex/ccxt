@@ -264,11 +264,14 @@ module.exports = class ftx extends Exchange {
             let type = this.safeString (market, 'type');
             if (type == "future" && id.indexOf("-PERP") != -1) {
                 type = "swap";
+            }else if (type == "future") {
+                //compatible with other Exchange object
+                type = "futures"
             }
             const base = this.safeCurrencyCode (baseId);
             const quote = this.safeCurrencyCode (quoteId);
             // check if a market is a spot or future market
-            const symbol = (type === 'future') ? this.safeString (market, 'name') : (base + '/' + quote);
+            const symbol = (type === 'futures') ? this.safeString (market, 'name') : (base + '/' + quote);
             const active = this.safeValue (market, 'enabled');
             const sizeIncrement = this.safeFloat (market, 'sizeIncrement');
             const priceIncrement = this.safeFloat (market, 'priceIncrement');
@@ -284,7 +287,7 @@ module.exports = class ftx extends Exchange {
                 'baseId': baseId,
                 'quoteId': quoteId,
                 'type': type,
-                'future': (type === 'future'),
+                'futures': (type === 'futures'),
                 'spot': (type === 'spot'),
                 'swap': (type == 'swap'),
                 'active': active,
