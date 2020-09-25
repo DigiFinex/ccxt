@@ -326,26 +326,22 @@ module.exports = class binance extends Exchange {
         const result = [];
         for (let t = 0; t < 3; t++) {
             let response = {}
-            //let type;
             switch (t) {
             case 0:
                 response = await this.publicGetExchangeInfo(params);
                 //type = 'spot';
                 break;
             case 1:
-                response = await this.fapiPublicGetExchangeInfo(params);
-                //type = 'swap';
+                response = await this.fapiPublicGetExchangeInfo(params); // U本位 fapi
                 break;
             case 2:
-                response = await this.dapiPublicGetExchangeInfo(params);
-                //type = 'futures';
+                response = await this.dapiPublicGetExchangeInfo(params); // 币本位 dapi
                 break;
             }
             let markets = this.safeValue(response, 'symbols');
-            //console.log (markets);
             for (let i = 0; i < markets.length; i++) {
                 const market = markets[i];
-                const id = this.safeString(market, 'symbol');
+                let id = this.safeString(market, 'symbol');
                 const baseId = market['baseAsset'];
                 const quoteId = market['quoteAsset'];
                 const base = this.safeCurrencyCode(baseId);
@@ -367,10 +363,18 @@ module.exports = class binance extends Exchange {
                     }
                 }
                 let symbol;
-                if (t == 0) {
-                    symbol = base + '/' + quote;
-                } else {
-                    symbol = id;
+                switch (t){
+                    case 0:
+                        symbol = base + '/' + quote;
+                        break;
+                    case 1:
+                        symbol = id;
+                        id = symbol + '_f';
+                        break;
+                    case 2:
+                        symbol = id;
+                        id = symbol + '_d';
+                        break;
                 }
                 const filters = this.indexBy(market['filters'], 'filterType');
                 const precision = {
@@ -394,7 +398,7 @@ module.exports = class binance extends Exchange {
                     'type': symbolType,
                     'limits': {
                         'amount': {
-                            'min': t == 0 ? Math.pow(10, -precision['amount']) : 1,
+                            'min': t === 0 ? Math.pow(10, -precision['amount']) : 1,
                             'max': undefined,
                         },
                         'price': {
@@ -402,7 +406,7 @@ module.exports = class binance extends Exchange {
                             'max': undefined,
                         },
                         'cost': {
-                            'min': t == 0 ? -1 * Math.log10(precision['amount']) : undefined,
+                            'min': t === 0 ? -1 * Math.log10(precision['amount']) : undefined,
                             'max': undefined,
                         },
                     },
@@ -543,9 +547,9 @@ module.exports = class binance extends Exchange {
         return orderbook;
     }
 
-    parseTicker (ticker, market = undefined) {
+    parseTicker (ticker, type, market = undefined) {
         const timestamp = this.safeInteger (ticker, 'closeTime');
-        const symbol = this.findSymbol (this.safeString (ticker, 'symbol'), market);
+        const symbol = this.findSymbolByType (this.safeString (ticker, 'symbol'), type, market);
         const last = this.safeFloat (ticker, 'lastPrice');
         return {
             'symbol': symbol,
@@ -591,13 +595,13 @@ module.exports = class binance extends Exchange {
             'symbol': market['id'],
         };
         const response = await this.publicGetTicker24hr (this.extend (request, params));
-        return this.parseTicker (response, market);
+        return this.parseTicker (response, 'spot', market);
     }
 
-    parseTickers (rawTickers, symbols = undefined) {
+    parseTickers (rawTickers, type, symbols = undefined) {
         const tickers = [];
         for (let i = 0; i < rawTickers.length; i++) {
-            tickers.push (this.parseTicker (rawTickers[i]));
+            tickers.push (this.parseTicker (rawTickers[i], type));
         }
         return this.filterByArray (tickers, 'symbol', symbols);
     }
@@ -605,7 +609,7 @@ module.exports = class binance extends Exchange {
     async fetchBidsAsks (symbols = undefined, params = {}) {
         await this.loadMarkets ();
         const response = await this.publicGetTickerBookTicker (params);
-        return this.parseTickers (response, symbols);
+        return this.parseTickers (response, 'spot', symbols);
     }
 
     async fetchTickers (symbols = undefined, params = {}) {
@@ -618,7 +622,12 @@ module.exports = class binance extends Exchange {
             method = 'fapiPublicGetTicker24hr';
         }
         const response = await this[method] ();
-        return this.parseTickers (response, symbols);
+        let result = this.parseTickers (response, type, symbols);
+        //let fs = require('fs');
+        //fs.writeFile('binance.raw', JSON.stringify(response), function(err) {});
+        //fs.writeFile('binance.acts', JSON.stringify(result), function(err) {});
+        //console.log(response.length, Object.keys(result).length);
+        return result;
     }
 
     parseOHLCV (ohlcv, market = undefined, timeframe = '1m', since = undefined, limit = undefined) {
@@ -822,6 +831,21 @@ module.exports = class binance extends Exchange {
             'EXPIRED': 'expired',
         };
         return this.safeString (statuses, status, status);
+    }
+
+    findSymbolByType (name, type, market = undefined) {
+        switch (type) {
+            case 'spot':
+            case 'margin':
+                return this.findSymbol(name, market);
+            case 'futures':
+            case 'swap':
+                let result = this.findSymbol(name+'p', market);
+                if (result) {
+                    return result;
+                }
+                return this.findSymbol(name+'f', symbol);
+        }
     }
 
     parseOrder (order, market = undefined) {
