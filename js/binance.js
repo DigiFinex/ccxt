@@ -352,6 +352,7 @@ module.exports = class binance extends Exchange {
                 } else {
                     switch (market['contractType']) {
                         case 'PERPETUAL':
+                        case 'PERPETUAL DELIVERING': //binance BCHUSDT 有时会返回这种contractType
                         case undefined:
                             symbolType = 'swap';
                             break;
