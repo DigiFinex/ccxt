@@ -279,6 +279,7 @@ module.exports = class digifinex extends Exchange {
                 'precision': precision,
                 'limits': limits,
                 'info': market,
+                'active': true,
             });
         }
         return result;

@@ -1356,6 +1356,7 @@ module.exports = class okex3 extends Exchange {
             //account['free'] = this.safeFloat (balance, 'total_avail_balance'); // total_avail_balance是最近一次结算时的账户权益+结算后转入-转出
             account['used'] = this.safeFloat (balance, 'margin') /* 持仓占用 */ + this.safeFloat (balance, 'margin_frozen') /* 挂单占用 */;
             account['margin_ratio'] = this.safeFloat (balance, 'margin_ratio'); // liujian
+            account['unrealizedProfit'] = this.safeFloat (balance, 'unrealized_pnl')
             result[symbol] = account;
         }
         return this.parseBalance (result);
