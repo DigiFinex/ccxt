@@ -438,7 +438,11 @@ module.exports = class binance extends Exchange {
                     };
                 }
                 if ('MIN_NOTIONAL' in filters) {
-                    entry['limits']['cost']['min'] = this.safeFloat(filters['MIN_NOTIONAL'], 'minNotional');
+                    if(symbolType === 'swap') {
+                        entry['limits']['cost']['min'] = this.safeFloat(filters['MIN_NOTIONAL'], 'notional');
+                    }else {
+                        entry['limits']['cost']['min'] = this.safeFloat(filters['MIN_NOTIONAL'], 'minNotional');
+                    }
                 }
                 result.push(entry);
             }
