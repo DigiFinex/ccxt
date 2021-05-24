@@ -80,8 +80,9 @@ const truncate_regExpCache = []
     , truncate = (num, precision = 0) => parseFloat (truncate_to_string (num, precision))
 
 function precisionFromString (string) {
-    const split = string.replace (/0+$/g, '').split ('.')
-    return (split.length > 1) ? (split[1].length) : 0
+    //const split = string.replace (/0+$/g, '').split ('.')
+    //return (split.length > 1) ? (split[1].length) : 0
+    return 0 - Math.log10( parseFloat (string) )
 }
 
 /*  ------------------------------------------------------------------------ */
